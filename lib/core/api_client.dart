@@ -1,18 +1,9 @@
-import 'dart:io' show Platform;
-
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _authPrefsKey = 'employee_auth';
 
-/// Android emulator can't reach the host machine via `localhost`; it maps
-/// the host loopback to 10.0.2.2 instead. iOS simulator and web can use
-/// localhost directly.
-String _defaultBaseUrl() {
-  if (!kIsWeb && Platform.isAndroid) return 'http://10.0.2.2:3000/api';
-  return 'http://localhost:3000/api';
-}
+String _defaultBaseUrl() => 'https://thebrewcorner-be.onrender.com/api';
 
 class ApiClient {
   ApiClient._internal(this.dio);
