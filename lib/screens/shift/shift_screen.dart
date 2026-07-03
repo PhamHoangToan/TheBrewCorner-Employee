@@ -6,8 +6,10 @@ import '../../core/theme.dart';
 import '../../models/shift_assignment.dart';
 import '../../providers/attendance_provider.dart' show MonthKey;
 import '../../providers/shift_provider.dart';
+import '../../providers/shift_request_provider.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/status_chip.dart';
+import 'shift_request_screen.dart';
 
 final _weekdayFmt = DateFormat('EEEE, dd/MM', 'vi');
 
@@ -34,12 +36,72 @@ class _ShiftScreenState extends ConsumerState<ShiftScreen> {
     setState(() => _month = DateTime(_month.year, _month.month + delta));
   }
 
+  // Gửi yêu cầu nhượng lại 1 ca đã được phân (admin duyệt mới có hiệu lực)
+  Future<void> _confirmSwap(ShiftAssignment assignment) async {
+    final reasonCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nhượng lại ca này?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${assignment.shiftName} · ${_weekdayFmt.format(assignment.workDate)}',
+              style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonCtrl,
+              maxLines: 2,
+              decoration: const InputDecoration(hintText: 'Lý do nhượng ca...'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Hủy')),
+          ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Gửi yêu cầu')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(shiftRequestRepositoryProvider).submitSwap(
+            assignmentId: assignment.id,
+            workDate: assignment.workDate,
+            reason: reasonCtrl.text.trim(),
+          );
+      ref.invalidate(myShiftRequestsProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã gửi yêu cầu nhượng ca — chờ quản lý duyệt')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gửi yêu cầu thất bại')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final assignmentsAsync = ref.watch(shiftAssignmentsProvider(_key));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Ca làm việc')),
+      appBar: AppBar(
+        title: const Text('Ca làm việc'),
+        actions: [
+          TextButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ShiftRequestScreen()),
+            ),
+            icon: const Icon(Icons.add_circle_outline, size: 18),
+            label: const Text('Đăng ký ca'),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(shiftAssignmentsProvider(_key)),
         child: assignmentsAsync.when(
@@ -71,7 +133,8 @@ class _ShiftScreenState extends ConsumerState<ShiftScreen> {
                 if (assignments.isEmpty)
                   const EmptyState(message: 'Chưa có ca làm việc nào trong tháng này', icon: Icons.event_busy_outlined)
                 else
-                  for (final a in assignments) _ShiftRow(assignment: a),
+                  for (final a in assignments)
+                    _ShiftRow(assignment: a, onSwap: () => _confirmSwap(a)),
               ],
             );
           },
@@ -84,8 +147,9 @@ class _ShiftScreenState extends ConsumerState<ShiftScreen> {
 }
 
 class _ShiftRow extends StatelessWidget {
-  const _ShiftRow({required this.assignment});
+  const _ShiftRow({required this.assignment, required this.onSwap});
   final ShiftAssignment assignment;
+  final VoidCallback onSwap;
 
   bool get _isFuture => assignment.workDate.isAfter(DateTime.utc(
         DateTime.now().year,
@@ -102,7 +166,11 @@ class _ShiftRow extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget? trailing;
     if (_isFuture || assignment.status == 'SCHEDULED') {
-      trailing = const Text('— Chưa tới ngày', style: TextStyle(fontSize: 11, color: AppColors.textMuted));
+      trailing = TextButton(
+        onPressed: onSwap,
+        style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8), minimumSize: Size.zero),
+        child: const Text('Nhượng ca', style: TextStyle(fontSize: 11)),
+      );
     } else if (assignment.status == 'ABSENT') {
       trailing = _isLeaveNote
           ? StatusChip(label: assignment.note ?? 'Nghỉ phép', background: AppColors.cream, foreground: AppColors.brand)

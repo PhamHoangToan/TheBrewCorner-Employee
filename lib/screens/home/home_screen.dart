@@ -5,10 +5,12 @@ import 'package:intl/intl.dart';
 import '../../core/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/leave_provider.dart';
+import '../../providers/notifications_provider.dart';
 import '../../providers/payroll_provider.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/stat_card.dart';
 import '../../widgets/status_chip.dart';
+import '../notifications/notifications_screen.dart';
 
 final _currency = NumberFormat.decimalPattern('vi_VN');
 final _dateFmt = DateFormat('dd/MM/yyyy');
@@ -47,6 +49,19 @@ class HomeScreen extends ConsumerWidget {
           ),
         ),
         actions: [
+          Consumer(builder: (context, ref, _) {
+            final unread = ref.watch(unreadCountProvider).valueOrNull ?? 0;
+            return IconButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+              ),
+              icon: Badge(
+                isLabelVisible: unread > 0,
+                label: Text('$unread'),
+                child: const Icon(Icons.notifications_outlined, color: Colors.white),
+              ),
+            );
+          }),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: PopupMenuButton<String>(
@@ -71,6 +86,7 @@ class HomeScreen extends ConsumerWidget {
         onRefresh: () async {
           ref.invalidate(payrollListProvider);
           ref.invalidate(leaveRequestsProvider);
+          ref.invalidate(unreadCountProvider);
           await ref.read(authProvider.notifier).refreshProfile();
         },
         child: ListView(
