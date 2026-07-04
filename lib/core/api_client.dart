@@ -44,4 +44,18 @@ class ApiClient {
   }
 
   bool get hasToken => _token != null;
+
+  // Đăng ký / hủy đăng ký token FCM cho push notification.
+  // Gọi sau khi lấy được token từ firebase_messaging (cần cài plugin + google-services.json).
+  Future<void> registerPushToken(String userId, String token) async {
+    try {
+      await dio.post('/push/register-device', data: {'userId': userId, 'token': token});
+    } catch (_) {/* best-effort */}
+  }
+
+  Future<void> unregisterPushToken(String userId, String token) async {
+    try {
+      await dio.post('/push/unregister-device', data: {'userId': userId, 'token': token});
+    } catch (_) {/* best-effort */}
+  }
 }
