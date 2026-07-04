@@ -162,19 +162,30 @@ class _ShiftRow extends StatelessWidget {
     return n.contains('phép') || n.contains('phep');
   }
 
+  bool get _isSwapNote {
+    final n = (assignment.note ?? '').toLowerCase();
+    return n.contains('nhượng ca') || n.contains('nhuong ca');
+  }
+
   @override
   Widget build(BuildContext context) {
     Widget? trailing;
-    if (_isFuture || assignment.status == 'SCHEDULED') {
+    if (assignment.status == 'ABSENT') {
+      // Vắng mặt / nghỉ phép / đã nhượng ca luôn ưu tiên hiện đúng, kể cả khi ca ở ngày tương lai.
+      trailing = _isSwapNote
+          ? StatusChip(label: assignment.note ?? 'Cần người thay', background: AppColors.amberBg, foreground: AppColors.amberFg)
+          : _isLeaveNote
+              ? StatusChip(label: assignment.note ?? 'Nghỉ phép', background: AppColors.cream, foreground: AppColors.brand)
+              : const StatusChip(label: 'Vắng mặt', background: AppColors.redBg, foreground: AppColors.redFg);
+    } else if (_isFuture) {
       trailing = TextButton(
         onPressed: onSwap,
         style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8), minimumSize: Size.zero),
         child: const Text('Nhượng ca', style: TextStyle(fontSize: 11)),
       );
-    } else if (assignment.status == 'ABSENT') {
-      trailing = _isLeaveNote
-          ? StatusChip(label: assignment.note ?? 'Nghỉ phép', background: AppColors.cream, foreground: AppColors.brand)
-          : const StatusChip(label: 'Vắng mặt', background: AppColors.redBg, foreground: AppColors.redFg);
+    } else if (assignment.status == 'SCHEDULED') {
+      // Đã tới ngày làm nhưng chưa ai cập nhật / không có chấm công → coi là vắng mặt.
+      trailing = const StatusChip(label: 'Vắng mặt', background: AppColors.redBg, foreground: AppColors.redFg);
     } else {
       trailing = const StatusChip(label: 'Đang làm', background: AppColors.greenBg, foreground: AppColors.greenFg);
     }
